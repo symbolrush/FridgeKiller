@@ -1,0 +1,353 @@
+
+// The FridgeKiller
+// v11, 17.02.13, cleaned up a bit..
+
+// SynthDefs
+
+(
+SynthDef(\sininstr, { arg out=0, freq=440, amp=0.1, pan=0, gate=1;
+  		var z;
+			z = LPF.ar(
+				Mix.ar(SinOsc.ar(freq*[1,1,1,SinOsc.ar(0.05,0,SinOsc.ar(0.1,0,0.01,0.005),1)],0.1,amp)),
+				XLine.kr(5000, 1000,20)) 
+			* EnvGen.kr(Env.new([0,1,0],[0.01,0.00000001],\lin,1), gate, doneAction:2); 
+			Out.ar(out, Pan2.ar(z, pan));
+		}).add; 
+
+SynthDef(\yourenotasmuch, { arg out=0, freq=440, amp=0.1, pan=0, gate=1, del_att=0.3, del_dec=2;
+			var gen = Saw.ar(freq)*0.1;
+			var fmod = LFCub.kr(1/12).range(1, 2); // modulate filter
+			var rqmod = LFNoise2.kr(1/8).range(0.1,1.0);
+			var snd = RLPF.ar(gen, freq * LFNoise2.kr(1,0.01,1) * fmod, rqmod)			* EnvGen.kr(Env.new([0,1,0],[del_att,del_dec],\lin,1), gate, doneAction:2); 
+			Out.ar(out, Pan2.ar(snd, pan));
+		}).add; 
+
+SynthDef(\paddy, { arg out=0, freq=440, amp=0.4, gate=1, del_att=0.05, del_dec=2;
+			var gen = Saw.ar(freq)*0.4;
+			var fmod = LFCub.kr(3.4).range(5, 15); // modulate filter with mouse
+			var rqmod = LFNoise2.kr(1/8).range(0.1,1.0);
+			var snd = RLPF.ar(gen, freq * LFNoise2.kr(1,0.01,1) * fmod, rqmod)			* EnvGen.kr(Env.new([0,1,0],\lin,1), gate, doneAction:2); 
+			Out.ar(out, snd);
+		}).add; 
+		
+SynthDef(\padbass, { arg out=0, freq=440, amp=0.1, pan=0, gate=1;
+			var gen = Saw.ar(freq)*1;
+			var fmod = LFCub.kr(1/12).range(1, 20); // modulate filter with mouse
+			var rqmod = LFNoise2.kr(1/8).range(0.1,1.0);
+			var snd = RLPF.ar(gen, freq * LFNoise2.kr(1,0.01,1) * fmod, rqmod)			* EnvGen.kr(Env.new([0,1,0],[0.2,0.2],\lin,1), gate, doneAction:2); 
+			Out.ar(out, Pan2.ar(snd, pan));
+		}).add; 
+
+SynthDef(\sinegrain, {arg pan=1, freq, amp; var grain; 
+	grain= SinOsc.ar(freq, 0, amp)*(XLine.kr(1.001,0.001,4,doneAction:2)-0.001);
+	Out.ar(0,Pan2.ar(grain, pan))}).add; 
+
+SynthDef(\bass1, { arg out=0, freq=40, amp=0.6, pan=0, gate=1;
+			var z;
+			z = LPF.ar(Mix.ar([SinOsc.ar(freq,0.1,amp), Saw.ar(freq,amp)]),
+				XLine.kr(2000, 100,20)) 
+			* EnvGen.kr(Env.new([0,1,0],[0.01,0.12],\lin,1), gate, doneAction:2); 
+			Out.ar(out, Pan2.ar(z, pan));
+		}).add; 
+
+SynthDef(\bass2, { arg out=0, freq=40, amp=0.6, pan=0, gate=1;
+			var z;
+			z = LPF.ar(Mix.ar([SinOsc.ar(freq*[0.5,1,2],0.1,amp*[0.4,1,0.2]), Saw.ar(freq,amp)]),
+				XLine.kr(2000, 100,20)) 
+			* EnvGen.kr(Env.new([0,1,0],[0.01,0.12],\lin,1), gate, doneAction:2); 
+			Out.ar(out, Pan2.ar(z, pan));
+		}).add; 
+
+SynthDef(\bass3, { arg out=0, freq=40, amp=0.6, pan=0, gate=1;
+			var z;
+			z = LPF.ar(Mix.ar([SinOsc.ar(freq*[0.99,1,1.01],0.1,amp), Saw.ar(freq,amp)]),
+				XLine.kr(2000, 100,20)) 
+			* EnvGen.kr(Env.new([0,1,0],[0.01,0.12],\lin,1), gate, doneAction:2); 
+			Out.ar(out, Pan2.ar(z, pan));
+		}).add; 
+)
+
+// Brother
+// Da ist das Ding
+(
+	var offset = 0;
+	var ampoffset = 0.05;
+	var waittime = 0.3;
+	var synthi = \sinegrain; //choose sinegrain or sawgrain
+	var state = 0;
+	var wostock;
+	var amp;
+	var pan;
+	var freq;
+	var on = 1;
+	var brother;
+	
+	{
+	
+	brother = Synth.new(\sininstr, [\freq, 62.midicps,\amp, 0.2]);
+	brother.play;
+	
+	c = NoteOnResponder({ |src,chan,note,vel|
+        /*"midi".postln; note.postln;*/ 
+	    freq=note;
+        },
+        nil, // any source
+        nil, // any channel
+        nil, // any note
+        nil, // any vel
+    );
+
+	
+	
+	// Setting up Communication with Arduino
+	p = ArduinoSMS("/dev/tty.usbmodem1d11", 115200);
+	// Schnallt euch an!
+	while{state==0}{										p.action = { |... msg| 
+		m=[msg[0],msg[1]]; //Parse message stream. use m[0] as identifier and m[1] as value
+		case
+			{m[0]=="cbut"} {
+				case
+					{m[1]==1} {on=0; "C-Button: ".post;on.postln}
+					{m[1]==0} {on=1;}
+				}
+			
+			{m[0]=="zbut"} {
+				state=1;
+				}
+			{m[0]=="joyx"} {
+				waittime=(3/m[1]);
+				if(waittime > 0.5){waittime=0.5};
+				if(waittime < 0.05){waittime=0.05};
+				}	
+			{m[0]=="joyy"} {
+				offset=(((m[1]-50)/25).roundUp(1)*12)-12;
+				}
+			{m[0]=="midi"}{
+				"MIDI! Yeah.".postln;
+				}	
+			
+			};
+		waittime.wait;
+		"Wait: ".post;
+		waittime.postln;
+		"Note: ".post;
+		freq.postln;
+		"Offset: ".post;
+		offset.postln;
+	
+		wostock = Pbind(
+	\dur,waittime,
+	\midinote, offset+Pseq([freq],1)+Prand([12,24],1), 
+     \amp, (Pgauss(0.0, 0.2, 1)+ampoffset)*on,
+     \pan, 0,
+     \instrument, synthi
+	).play;
+ 
+		
+	};
+	while{state==1}{
+		//wostock.stop;
+		0.5.wait;
+		//"The fridge.".speak;
+		p.close;
+		state=2;
+		brother.free;
+		NoteOnResponder.removeAll;
+		}
+
+}.fork(AppClock)
+)
+
+// yourenotasmuch
+// MidiKeyboard (funktioniert mit nickinstr, sininstr, paddy und fatbass)
+
+(
+var notes, on, off;
+
+//MIDIIn.connect;
+
+notes = Array.newClear(128);  // array has one slot per possible MIDI note
+
+on = NoteOnResponder({ |src, chan, num, veloc|
+	notes[num] = Synth(\yourenotasmuch, [\freq, num.midicps,
+		\amp, veloc * 0.00315]);
+});
+
+off = NoteOffResponder({ |src, chan, num, veloc|
+	notes[num].release;
+});
+
+q = { on.remove; off.remove; };
+)
+MIDIResponder.removeAll;
+
+
+// Kiddo
+
+(
+m = NoteOnResponder( { |src, chan, num, vel| 
+	var x = Synth.new(\bass3,[\freq, num.midicps,\out,0,\amp,0.6,\dur,1,]);
+	Task({ 
+		0.20.wait; 
+		x.free }).play;
+},nil,nil,(0..127), (0..127) );
+)
+MIDIResponder.removeAll;
+
+
+// System
+(
+	var offset = 0;
+	var ampoffset = 0.05;
+	var waittime = 0.3;
+	var synthi = \sinegrain; //choose sinegrain or sawgrain
+	var state = 0;
+	var wostock;
+	var amp;
+	var pan;
+	var freq;
+	var on = 1;
+	var brother;
+	
+	{
+	c = NoteOnResponder({ |src,chan,note,vel|
+        /*"midi".postln; note.postln;*/ 
+	    freq=note;
+        },
+        nil, // any source
+        nil, // any channel
+        nil, // any note
+        nil, // any vel
+    );
+
+	
+	
+	// Setting up Communication with Arduino
+	p = ArduinoSMS("/dev/tty.usbmodem1d11", 115200);
+	// Schnallt euch an!
+	while{state==0}{										p.action = { |... msg| 
+		m=[msg[0],msg[1]]; //Parse message stream. use m[0] as identifier and m[1] as value
+		case
+			{m[0]=="cbut"} {
+				case
+					{m[1]==1} {on=0; "C-Button: ".post;on.postln}
+					{m[1]==0} {on=1;}
+				}
+			
+			{m[0]=="zbut"} {
+				state=1;
+				}
+			{m[0]=="joyx"} {
+				waittime=(3/m[1]);
+				if(waittime > 0.5){waittime=0.5};
+				if(waittime < 0.05){waittime=0.05};
+				}	
+			{m[0]=="joyy"} {
+				offset=(((m[1]-50)/25).roundUp(1)*12)-12;
+				}
+			{m[0]=="midi"}{
+				"MIDI! Yeah.".postln;
+				}	
+			
+			};
+		waittime.wait;
+		"Wait: ".post;
+		waittime.postln;
+		"Note: ".post;
+		freq.postln;
+		"Offset: ".post;
+		offset.postln;
+	
+		wostock = Pbind(
+	\dur,waittime,
+	\midinote, offset+Pseq([freq],1)+Prand([12,24],1), 
+     \amp, (Pgauss(0.0, 0.2, 1)+ampoffset)*on,
+     \pan, 0,
+     \instrument, synthi
+	).play;
+ 
+		
+	};
+	while{state==1}{
+		//wostock.stop;
+		0.5.wait;
+		//"The fridge.".speak;
+		p.close;
+		state=2;
+		NoteOnResponder.removeAll;
+		}
+
+}.fork(AppClock)
+)
+
+
+// Drawer
+// MidiKeyboard (funktioniert mit nickinstr, sininstr, paddy und fatbass)
+
+(
+var notes, on, off;
+
+//MIDIIn.connect;
+
+notes = Array.newClear(128);  // array has one slot per possible MIDI note
+
+on = NoteOnResponder({ |src, chan, num, veloc|
+	notes[num] = Synth(\sininstr, [\freq, num.midicps,
+		\amp, veloc * 0.00115]);
+});
+
+off = NoteOffResponder({ |src, chan, num, veloc|
+	notes[num].release;
+});
+
+q = { on.remove; off.remove; };
+)
+MIDIResponder.removeAll;
+
+
+// CommandMe
+
+(
+m = NoteOnResponder( { |src, chan, num, vel| 
+	var x = Synth.new(\bass3,[\freq, num.midicps,\out,0,\amp,0.6,\dur,1,]);
+	Task({ 
+		0.20.wait; 
+		x.free }).play;
+},nil,nil,(0..127), (0..127) );
+)
+MIDIResponder.removeAll;
+
+// Machine
+// MidiKeyboard gesplittet (funktioniert mit nickinstr, sininstr, paddy und fatbass)
+
+(
+var notes, on, off, splitpoint;
+
+//MIDIIn.connect;
+
+splitpoint = 50;
+notes = Array.newClear(128);  // array has one slot per possible MIDI note
+
+on = NoteOnResponder({ |src, chan, num, veloc|
+	if(num > splitpoint, {
+	
+	notes[num] = Synth(\paddy, [\freq, num.midicps,
+		\amp, 1]);},{
+			
+	notes[num] = Synth(\padbass, [\freq, num.midicps,
+		\amp, 1]);});
+			
+});
+
+off = NoteOffResponder({ |src, chan, num, veloc|
+	notes[num].release;
+});
+
+q = { on.remove; off.remove; };
+)
+MIDIResponder.removeAll;
+
+
+
+
+
