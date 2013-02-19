@@ -1,0 +1,84 @@
+/*
+ * ColliDuino_Arduino_v1 
+ *
+ * 2012 Adrian Schmid
+ *
+ */
+
+#include <Wire.h>
+#include "nunchuck_funcs.h"
+
+int accx, accy, zbut, cbut, joyx,joyy;
+int accx_old, accy_old, zbut_old, cbut_old, joyx_old, joyy_old;
+
+void setup()
+{
+    Serial.begin(115200);
+    nunchuck_setpowerpins(); // Set Analog Pins to GND and Power
+    nunchuck_init(); // send the initilization handshake
+    
+    Serial.println("ColliDuino ready!");
+    delay(1000);
+}
+
+void loop()
+{
+   nunchuck_get_data();
+        // Getting accx and scale it to a value between 1-100
+        accx  = nunchuck_accelx()-90; // optimale Kalibrierung
+        if(accx < 1){accx = 1;}
+        if(accx > 100){accx = 100;}
+        // Getting accy and scale it to a value between 1-100
+        accy  = nunchuck_accely()-80; // optimale Kalibrierung
+        if(accy < 1){accy = 1;}
+        if(accy > 100){accy = 100;}
+        // Getting joyx and scale it to a value between 1-100
+        joyx =  (nunchuck_joyx()-36)/2;
+        if(joyx < 1){joyx = 1;}
+        if(joyx > 100){joyx = 100;}
+        // Getting joyy and scale it to a value between 1-100
+        joyy = (nunchuck_joyy()-20)/1.9;
+        if(joyy < 1){joyy = 1;}
+        if(joyy > 100){joyy = 100;}
+        // Getting the buttons
+        zbut = nunchuck_zbutton();
+        cbut = nunchuck_cbutton(); 
+            
+        if(accx != accx_old){
+          Serial.print("accx "); 
+          Serial.print(accx);
+          Serial.println();
+          accx_old = accx;
+        }
+        if(accy != accy_old){
+          Serial.print("accy "); 
+          Serial.print(accy);
+          Serial.println();
+          accy_old = accy;
+        }
+        if(joyx != joyx_old){
+          Serial.print("joyx "); 
+          Serial.print(joyx);
+          Serial.println();
+          joyx_old = joyx;
+        }
+        if(joyy != joyy_old){
+          Serial.print("joyy "); 
+          Serial.print(joyy);
+          Serial.println();
+          joyy_old = joyy;
+        }
+        if(zbut != zbut_old){
+          Serial.print("zbut "); 
+          Serial.print(zbut);
+          Serial.println();
+          zbut_old = zbut;
+        }
+        if(cbut != cbut_old){
+          Serial.print("cbut "); 
+          Serial.print(cbut);
+          Serial.println();
+          cbut_old = cbut;
+        }
+        delay(5);
+}
